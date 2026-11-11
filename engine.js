@@ -183,9 +183,10 @@
       var lx0 = Math.max(220, 60 + ten + 40);
       o += '<g style="font-family:Georgia,serif;font-size:11px;fill:' + C.ink3 + ';font-style:italic"><circle cx="' + lx0 + '" cy="' + by + '" r="5" fill="' + C.seal + '"/><text x="' + (lx0 + 10) + '" y="' + (by + 4) + '">Investigator</text><rect x="' + (lx0 + 90) + '" y="' + (by - 5) + '" width="10" height="10" fill="' + C.wash + '" stroke="' + C.ink3 + '" stroke-width=".5"/><text x="' + (lx0 + 105) + '" y="' + (by + 4) + '">Glimpsed</text><rect x="' + (lx0 + 170) + '" y="' + (by - 5) + '" width="10" height="10" fill="' + C.ink2 + '"/><text x="' + (lx0 + 185) + '" y="' + (by + 4) + '">Unknown</text></g>';
       // hotspots
-      var hs = [];
+      var hs = [], active = !atRef || atRef.f.id === fid;
       function hot(x, y, w, h, label, action, room) {
         if (!action) return;
+        if (!active) { if (room && imgs[room]) hs.push('<g data-room="' + esc(room) + '"><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="transparent"/></g>'); return; }
         var lw = Math.round(label.length * 6.6 + 18), lx = x + w + 6, ly = y + h / 2 - 11;
         if (lx + lw > 650) lx = x - lw - 6; if (lx < 26) lx = Math.max(26, Math.min(650 - lw, x + w / 2 - lw / 2)), ly = y + h + 4; if (ly + 22 > VH - 26) ly = y - 26; if (ly < 26) ly = 26;
         hs.push('<g class="km-hot" data-a="' + esc(action) + '"' + (room ? ' data-room="' + esc(room) + '"' : "") + '><rect class="hl" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="transparent"/><g class="km-lbl"><rect x="' + lx + '" y="' + ly + '" width="' + lw + '" height="22" rx="3"/><text x="' + (lx + lw / 2) + '" y="' + (ly + 15) + '" text-anchor="middle">' + esc(label) + "</text></g></g>");
@@ -199,6 +200,7 @@
       });
       stairs.forEach(function (st) { if (state(st.room) === "unknown" || (st.hidden && !found[st.id])) return; hot(X(st.x), Y(st.y), S(st.w), S(st.h), st.dir === "down" ? "Go down" : "Go up", st.action || (st.dir === "down" ? "I go down the stairs." : "I go up the stairs.")); });
       items.forEach(function (it) { if (state(it.room) !== "explored" || (it.hidden && !found[it.id]) || !it.label) return; var pad = 4; hot(X(it.x) - pad, Y(it.y) - pad, S(it.w || 2) + pad * 2, S(it.h || 2) + pad * 2, it.label, it.action || ("I examine the " + it.label.toLowerCase() + "."), imgs[it.id] ? it.id : it.room); });
+      if (!active) o += '<text x="340" y="92" text-anchor="middle" style="font-family:Georgia,serif;font-style:italic;font-size:11px;fill:' + C.ink3 + '">View only \u2014 you are on another floor</text>';
       o += hs.join("") + "</svg>";
       return o;
     }
@@ -224,5 +226,5 @@
     };
   }
 
-  root.KeeperMap = { define: define, render: render, version: "1.1.0", _maps: MAPS };
+  root.KeeperMap = { define: define, render: render, version: "1.2.0", _maps: MAPS };
 })(typeof window !== "undefined" ? window : this);
