@@ -8,6 +8,7 @@
 (function (root) {
   "use strict";
   var MAPS = {};
+  var BASE = (function () { try { var src = document.currentScript && document.currentScript.src; var m = src && src.match(/^(.*?@)[^/]+\/engine\.js/); return m ? m[1] : ""; } catch (e) { return ""; } })();
   var KEY = "keeper";
   function decode(b64) {
     var bin = atob(b64), bytes = new Uint8Array(bin.length);
@@ -19,6 +20,7 @@
   var C = { paper: "#ecdfc0", paper2: "#f1e5c8", panel: "#f3e9d0", ink: "#2b1f12", ink2: "#3b2c1c", ink3: "#5a4630", wash: "#d9c79f", furn: "#e2d2ad", seal: "#8a1c14", glass: "#7b9aa8", gold: "#f2c46a" };
   var STYLE = '.km-hot{cursor:pointer}.km-hot .hl{stroke-opacity:0}.km-hot:hover .hl{stroke:#8a1c14;stroke-width:1.5;stroke-opacity:1;stroke-dasharray:4 3}.km-lbl{opacity:0;pointer-events:none;transition:opacity .15s}.km-hot:hover .km-lbl{opacity:1}.km-lbl rect{fill:#f6eed8;stroke:#3b2c1c;stroke-width:.8}.km-lbl text{font-family:Georgia,serif;font-style:italic;font-size:12px;fill:#2b1f12}' +
     '.km-tabs{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}.km-tabs button{font-family:Georgia,serif;font-size:13px;padding:4px 10px;border:1px solid #b9a882;background:#f3e9d0;color:#2b1f12;border-radius:4px;cursor:pointer}.km-tabs button.on{background:#2b1f12;color:#f3e9d0}' +
+    '.km-wrap{position:relative}.km-pv{position:absolute;right:28px;top:84px;width:44%;max-width:300px;background:#f6eed8;border:1px solid #3b2c1c;box-shadow:0 0 0 4px #ecdfc0,0 0 0 5px #3b2c1c;padding:6px 6px 4px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:3}.km-pv.on{opacity:1}.km-pv.pin{pointer-events:auto}.km-pv img{display:block;width:100%;height:auto;filter:sepia(.15)}.km-pv div{font-family:Georgia,serif;font-style:italic;font-size:12px;color:#2b1f12;text-align:center;margin-top:4px}.km-pv button{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;border:1px solid #3b2c1c;background:#f3e9d0;color:#2b1f12;font-size:12px;line-height:1;cursor:pointer;display:none;padding:0}.km-pv.pin button{display:block}' +
     '.km-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.km-acts button{font-size:13px;padding:6px 10px}.km-toast{font-family:Georgia,serif;font-size:13px;color:#5a4630;font-style:italic;min-height:18px;margin-top:6px}';
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]; }); }
@@ -87,6 +89,8 @@
       if (r.o.hidden && !found[roomId]) return "unknown";
       return explored[roomId] ? "explored" : glimpsed[roomId] ? "glimpsed" : "unknown";
     }
+    var imgs = opts.images || {};
+    function imgUrl(id) { var v = imgs[id]; if (!v) return ""; if (/^https?:/.test(v)) return v; return (opts.base || BASE || "https://cdn.jsdelivr.net/gh/polkovitch/keeper-maps@") + v; }
     var atRef = all[opts.at];
     var floorId = opts.floor || (atRef ? atRef.f.id : map.floors[0].id);
     var visibleFloors = map.floors.filter(function (fl) { return (fl.rooms || []).some(function (r) { return state(r.id) !== "unknown"; }) || fl.id === floorId; });
@@ -164,6 +168,7 @@
         var lx = r.label ? X(r.label[0]) : X(r.x + r.w / 2), ly = r.label ? Y(r.label[1]) : Y(r.y) + (r.labelAt === "bottom" ? S(r.h) - 10 : 18);
         o += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" style="font-family:Georgia,serif;font-style:italic;font-size:12px;paint-order:stroke;stroke:' + (st === "explored" ? C.paper2 : C.wash) + ';stroke-width:4px;fill:' + (st === "explored" ? C.ink : "#4a3826") + '">' + esc(r.name + (st === "glimpsed" ? " (unsurveyed)" : "")) + "</text>";
       });
+      rooms.forEach(function (r) { if (state(r.id) === "unknown" || !imgs[r.id]) return; o += '<text x="' + (X(r.x + r.w) - 12) + '" y="' + (Y(r.y) + 18) + '" text-anchor="middle" style="font-size:13px;fill:' + C.seal + '">\u2726</text>'; });
       stairs.forEach(function (st) { if (state(st.room) === "unknown" || (st.hidden && !found[st.id])) return; o += '<text x="' + X(st.x + st.w / 2) + '" y="' + (Y(st.y + st.h) + 13) + '" text-anchor="middle" style="font-family:Georgia,serif;font-style:italic;font-size:11px;fill:' + C.ink3 + '">' + esc(st.label || (st.dir === "down" ? "Stair down" : "Stair up")) + "</text>"; });
       // investigator
       if (atRef && atRef.f.id === fid) {
@@ -179,31 +184,39 @@
       o += '<g style="font-family:Georgia,serif;font-size:11px;fill:' + C.ink3 + ';font-style:italic"><circle cx="' + lx0 + '" cy="' + by + '" r="5" fill="' + C.seal + '"/><text x="' + (lx0 + 10) + '" y="' + (by + 4) + '">Investigator</text><rect x="' + (lx0 + 90) + '" y="' + (by - 5) + '" width="10" height="10" fill="' + C.wash + '" stroke="' + C.ink3 + '" stroke-width=".5"/><text x="' + (lx0 + 105) + '" y="' + (by + 4) + '">Glimpsed</text><rect x="' + (lx0 + 170) + '" y="' + (by - 5) + '" width="10" height="10" fill="' + C.ink2 + '"/><text x="' + (lx0 + 185) + '" y="' + (by + 4) + '">Unknown</text></g>';
       // hotspots
       var hs = [];
-      function hot(x, y, w, h, label, action) {
+      function hot(x, y, w, h, label, action, room) {
         if (!action) return;
         var lw = Math.round(label.length * 6.6 + 18), lx = x + w + 6, ly = y + h / 2 - 11;
         if (lx + lw > 650) lx = x - lw - 6; if (lx < 26) lx = Math.max(26, Math.min(650 - lw, x + w / 2 - lw / 2)), ly = y + h + 4; if (ly + 22 > VH - 26) ly = y - 26; if (ly < 26) ly = 26;
-        hs.push('<g class="km-hot" data-a="' + esc(action) + '"><rect class="hl" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="transparent"/><g class="km-lbl"><rect x="' + lx + '" y="' + ly + '" width="' + lw + '" height="22" rx="3"/><text x="' + (lx + lw / 2) + '" y="' + (ly + 15) + '" text-anchor="middle">' + esc(label) + "</text></g></g>");
+        hs.push('<g class="km-hot" data-a="' + esc(action) + '"' + (room ? ' data-room="' + esc(room) + '"' : "") + '><rect class="hl" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="transparent"/><g class="km-lbl"><rect x="' + lx + '" y="' + ly + '" width="' + lw + '" height="22" rx="3"/><text x="' + (lx + lw / 2) + '" y="' + (ly + 15) + '" text-anchor="middle">' + esc(label) + "</text></g></g>");
       }
       rooms.forEach(function (r) {
         var st = state(r.id); if (st === "unknown") return;
         var here = atRef && (opts.at === r.id || (atRef.o.room === r.id));
         var label = st === "glimpsed" ? (r.enterLabel || "Go to the " + r.name.toLowerCase()) : (here ? (r.searchLabel || "Search the " + r.name.toLowerCase()) : (r.enterLabel || "Go to the " + r.name.toLowerCase()));
         var action = st === "glimpsed" || !here ? (r.enter || "I go into the " + r.name.toLowerCase() + ".") : (r.search || "I search the " + r.name.toLowerCase() + ".");
-        hot(X(r.x) + 4, Y(r.y) + 4, S(r.w) - 8, S(r.h) - 8, label, action);
+        hot(X(r.x) + 4, Y(r.y) + 4, S(r.w) - 8, S(r.h) - 8, label, action, r.id);
       });
       stairs.forEach(function (st) { if (state(st.room) === "unknown" || (st.hidden && !found[st.id])) return; hot(X(st.x), Y(st.y), S(st.w), S(st.h), st.dir === "down" ? "Go down" : "Go up", st.action || (st.dir === "down" ? "I go down the stairs." : "I go up the stairs.")); });
-      items.forEach(function (it) { if (state(it.room) !== "explored" || (it.hidden && !found[it.id]) || !it.label) return; var pad = 4; hot(X(it.x) - pad, Y(it.y) - pad, S(it.w || 2) + pad * 2, S(it.h || 2) + pad * 2, it.label, it.action || ("I examine the " + it.label.toLowerCase() + ".")); });
+      items.forEach(function (it) { if (state(it.room) !== "explored" || (it.hidden && !found[it.id]) || !it.label) return; var pad = 4; hot(X(it.x) - pad, Y(it.y) - pad, S(it.w || 2) + pad * 2, S(it.h || 2) + pad * 2, it.label, it.action || ("I examine the " + it.label.toLowerCase() + "."), imgs[it.id] ? it.id : it.room); });
       o += hs.join("") + "</svg>";
       return o;
     }
 
     var html = "<style>" + STYLE + "</style>";
     if (visibleFloors.length > 1) html += '<div class="km-tabs">' + visibleFloors.map(function (f) { return '<button data-f="' + esc(f.id) + '"' + (f.id === floorId ? ' class="on"' : "") + ">" + esc(f.name) + "</button>"; }).join("") + "</div>";
-    html += '<div class="km-svg">' + draw(floorId) + "</div>";
+    html += '<div class="km-wrap"><div class="km-svg">' + draw(floorId) + '</div><div class="km-pv"><button aria-label="Close picture">\u2715</button><img alt=""><div></div></div></div>';
     if (opts.actions && opts.actions.length) html += '<div class="km-acts">' + opts.actions.map(function (a) { return '<button data-a="' + esc(a[1]) + '">' + esc(a[0]) + ' <span aria-hidden="true">\u2197</span></button>'; }).join("") + "</div>";
     html += '<div class="km-toast"></div>';
     el.innerHTML = html;
+    var pv = el.querySelector(".km-pv"), pvImg = pv.querySelector("img"), pvCap = pv.querySelector("div");
+    function nameOf(id) { var r = all[id]; return r ? (r.o.name || r.o.label || id) : id; }
+    function showPv(id, pin) { var u = imgUrl(id); if (!u) return false; if (pvImg.getAttribute("src") !== u) pvImg.src = u; pvCap.textContent = nameOf(id); pv.classList.add("on"); pv.classList.toggle("pin", !!pin); return true; }
+    function hidePv() { if (!pv.classList.contains("pin")) pv.classList.remove("on"); }
+    el.addEventListener("mouseover", function (e) { var h = e.target.closest("[data-room]"); if (h) showPv(h.getAttribute("data-room")); else hidePv(); });
+    el.addEventListener("mouseleave", hidePv);
+    pv.querySelector("button").onclick = function (e) { e.stopPropagation(); pv.classList.remove("pin", "on"); };
+    if (opts.show) showPv(opts.show, true);
     el.onclick = function (e) {
       var b = e.target.closest("[data-f]");
       if (b) { el.querySelectorAll(".km-tabs button").forEach(function (x) { x.classList.toggle("on", x === b); }); el.querySelector(".km-svg").innerHTML = draw(b.getAttribute("data-f")); return; }
@@ -211,5 +224,5 @@
     };
   }
 
-  root.KeeperMap = { define: define, render: render, version: "1.0.0", _maps: MAPS };
+  root.KeeperMap = { define: define, render: render, version: "1.1.0", _maps: MAPS };
 })(typeof window !== "undefined" ? window : this);
