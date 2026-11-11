@@ -1,4 +1,4 @@
-/* Keeper Maps engine v1 — renders a pre-defined floor plan in a Victorian engraved style,
+/* Keeper Maps engine v1.3 (click a picture to close it) — renders a pre-defined floor plan in a Victorian engraved style,
    revealing only what the investigator has explored. Map data: maps/<id>.js (obfuscated).
    Usage:
      <div id="km"></div>
@@ -20,7 +20,7 @@
   var C = { paper: "#ecdfc0", paper2: "#f1e5c8", panel: "#f3e9d0", ink: "#2b1f12", ink2: "#3b2c1c", ink3: "#5a4630", wash: "#d9c79f", furn: "#e2d2ad", seal: "#8a1c14", glass: "#7b9aa8", gold: "#f2c46a" };
   var STYLE = '.km-hot{cursor:pointer}.km-hot .hl{stroke-opacity:0}.km-hot:hover .hl{stroke:#8a1c14;stroke-width:1.5;stroke-opacity:1;stroke-dasharray:4 3}.km-lbl{opacity:0;pointer-events:none;transition:opacity .15s}.km-hot:hover .km-lbl{opacity:1}.km-lbl rect{fill:#f6eed8;stroke:#3b2c1c;stroke-width:.8}.km-lbl text{font-family:Georgia,serif;font-style:italic;font-size:12px;fill:#2b1f12}' +
     '.km-tabs{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}.km-tabs button{font-family:Georgia,serif;font-size:13px;padding:4px 10px;border:1px solid #b9a882;background:#f3e9d0;color:#2b1f12;border-radius:4px;cursor:pointer}.km-tabs button.on{background:#2b1f12;color:#f3e9d0}' +
-    '.km-wrap{position:relative}.km-pv{position:absolute;right:28px;top:84px;width:44%;max-width:300px;background:#f6eed8;border:1px solid #3b2c1c;box-shadow:0 0 0 4px #ecdfc0,0 0 0 5px #3b2c1c;padding:6px 6px 4px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:3}.km-pv.on{opacity:1}.km-pv.pin{pointer-events:auto}.km-pv img{display:block;width:100%;height:auto;filter:sepia(.15)}.km-pv div{font-family:Georgia,serif;font-style:italic;font-size:12px;color:#2b1f12;text-align:center;margin-top:4px}.km-pv button{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;border:1px solid #3b2c1c;background:#f3e9d0;color:#2b1f12;font-size:12px;line-height:1;cursor:pointer;display:none;padding:0}.km-pv.pin button{display:block}' +
+    '.km-wrap{position:relative}.km-pv{position:absolute;right:28px;top:84px;width:44%;max-width:300px;background:#f6eed8;border:1px solid #3b2c1c;box-shadow:0 0 0 4px #ecdfc0,0 0 0 5px #3b2c1c;padding:6px 6px 4px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:3}.km-pv.on{opacity:1}.km-pv.on{pointer-events:auto;cursor:pointer}.km-pv img{display:block;width:100%;height:auto;filter:sepia(.15)}.km-pv div{font-family:Georgia,serif;font-style:italic;font-size:12px;color:#2b1f12;text-align:center;margin-top:4px}.km-pv button{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;border:1px solid #3b2c1c;background:#f3e9d0;color:#2b1f12;font-size:12px;line-height:1;cursor:pointer;display:none;padding:0}.km-pv.pin button{display:block}' +
     '.km-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.km-acts button{font-size:13px;padding:6px 10px}.km-toast{font-family:Georgia,serif;font-size:13px;color:#5a4630;font-style:italic;min-height:18px;margin-top:6px}';
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]; }); }
@@ -213,11 +213,12 @@
     el.innerHTML = html;
     var pv = el.querySelector(".km-pv"), pvImg = pv.querySelector("img"), pvCap = pv.querySelector("div");
     function nameOf(id) { var r = all[id]; return r ? (r.o.name || r.o.label || id) : id; }
-    function showPv(id, pin) { var u = imgUrl(id); if (!u) return false; if (pvImg.getAttribute("src") !== u) pvImg.src = u; pvCap.textContent = nameOf(id); pv.classList.add("on"); pv.classList.toggle("pin", !!pin); return true; }
+    var pvClosed = null, pvId = null;
+    function showPv(id, pin) { if (!pin && id === pvClosed) return false; var u = imgUrl(id); if (!u) return false; pvId = id; if (pvImg.getAttribute("src") !== u) pvImg.src = u; pvCap.textContent = nameOf(id); pv.classList.add("on"); pv.classList.toggle("pin", !!pin); return true; }
     function hidePv() { if (!pv.classList.contains("pin")) pv.classList.remove("on"); }
-    el.addEventListener("mouseover", function (e) { var h = e.target.closest("[data-room]"); if (h) showPv(h.getAttribute("data-room")); else hidePv(); });
-    el.addEventListener("mouseleave", hidePv);
-    pv.querySelector("button").onclick = function (e) { e.stopPropagation(); pv.classList.remove("pin", "on"); };
+    el.addEventListener("mouseover", function (e) { if (e.target.closest(".km-pv")) return; var h = e.target.closest("[data-room]"); if (h) { var id = h.getAttribute("data-room"); if (id !== pvClosed) pvClosed = null; showPv(id); } else { pvClosed = null; hidePv(); } });
+    el.addEventListener("mouseleave", function () { pvClosed = null; hidePv(); });
+    pv.onclick = function (e) { e.stopPropagation(); e.preventDefault(); pvClosed = pvId; pv.classList.remove("pin", "on"); };
     if (opts.show) showPv(opts.show, true);
     el.onclick = function (e) {
       var b = e.target.closest("[data-f]");
@@ -226,5 +227,5 @@
     };
   }
 
-  root.KeeperMap = { define: define, render: render, version: "1.2.0", _maps: MAPS };
+  root.KeeperMap = { define: define, render: render, version: "1.3.0", _maps: MAPS };
 })(typeof window !== "undefined" ? window : this);
